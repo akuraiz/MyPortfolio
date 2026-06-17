@@ -1,58 +1,147 @@
 /* =========================================================
    HENG REAKSA PORTFOLIO — script.js
-   Libraries used:
-   - GSAP + ScrollTrigger: scroll-driven reveal animations
-   - VanillaTilt: 3D tilt on project/skill cards (already initialized via HTML attrs)
-   - jQuery Terminal: interactive terminal in the "Now" section
+   Libraries:
+   - GSAP + ScrollTrigger: scroll-driven animations
+   - VanillaTilt: 3D tilt on cards (via HTML data-tilt attrs)
+   - jQuery Terminal: interactive console
    ========================================================= */
 
-/* ── WAIT FOR DOM ── */
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ── 1. CURSOR GLOW ──────────────────────────────────────────
-    const cursorGlow = document.getElementById('cursor-glow');
-    let mouseX = 0, mouseY = 0;
-    let glowX = 0, glowY = 0;
+    // ── REGISTER SCROLLTRIGGER ───────────────────────────────────
+    gsap.registerPlugin(ScrollTrigger);
 
-    document.addEventListener('mousemove', (e) => {
-        mouseX = e.clientX;
-        mouseY = e.clientY;
-        cursorGlow.style.opacity = '1';
+    // ── 1. DEFINE ALL ANIMATED ELEMENTS & SET INITIAL STATE ─────
+    //
+    // ONE source of truth: GSAP sets elements invisible here,
+    // CSS never sets opacity:0 on these elements.
+    //
+    const heroEls = [
+        { el: '.hero-eyebrow',  y: 20 },
+        { el: '.hero-name',     y: 24 },
+        { el: '.hero-sub',      y: 20 },
+        { el: '.hero-cta',      y: 18 },
+        { el: '.hero-tags',     y: 16 },
+        { el: '.hero-visual',   x: 30, y: 0 },
+    ];
+
+    const scrollEls = [
+        // About
+        { el: '.about-img-col' },
+        { el: '.about-text-col .section-eyebrow' },
+        { el: '.about-text-col .section-title' },
+        { el: '.about-body',         stagger: true },
+        { el: '.about-stats' },
+        // Now
+        { el: '#now .section-eyebrow' },
+        { el: '#now .section-title' },
+        { el: '#now .section-desc' },
+        { el: '#terminal-container' },
+        // Projects
+        { el: '#projects .section-eyebrow' },
+        { el: '#projects .section-title' },
+        { el: '.project-featured' },
+        { el: '.project-card',        stagger: true },
+        // Skills
+        { el: '#skills .section-eyebrow' },
+        { el: '#skills .section-title' },
+        { el: '.skills-col',          stagger: true },
+        // Goals
+        { el: '#goals .section-eyebrow' },
+        { el: '#goals .section-title' },
+        { el: '.goal-item',           stagger: true },
+        // Gaming
+        { el: '#gaming .section-eyebrow' },
+        { el: '#gaming .section-title' },
+        { el: '.gaming-card',         stagger: true },
+        // Contact
+        { el: '#contact .section-eyebrow' },
+        { el: '#contact .section-title' },
+        { el: '#contact .section-desc' },
+        { el: '.contact-link',        stagger: true },
+    ];
+
+    // Set all scroll elements invisible immediately (before paint)
+    scrollEls.forEach(({ el }) => {
+        const nodes = document.querySelectorAll(el);
+        if (nodes.length) gsap.set(nodes, { opacity: 0, y: 22 });
     });
-    document.addEventListener('mouseleave', () => {
-        cursorGlow.style.opacity = '0';
+
+    // Set hero elements invisible
+    heroEls.forEach(({ el, x = 0, y = 0 }) => {
+        const nodes = document.querySelectorAll(el);
+        if (nodes.length) gsap.set(nodes, { opacity: 0, x, y });
     });
 
-    // Smooth cursor glow follow
-    function animateCursor() {
-        glowX += (mouseX - glowX) * 0.08;
-        glowY += (mouseY - glowY) * 0.08;
-        cursorGlow.style.left = glowX + 'px';
-        cursorGlow.style.top  = glowY + 'px';
-        requestAnimationFrame(animateCursor);
-    }
-    animateCursor();
+    // ── 2. HERO ENTRANCE (runs once on load) ────────────────────
+    const heroTl = gsap.timeline({ delay: 0.25 });
+    heroEls.forEach(({ el, x = 0, y = 0 }, i) => {
+        heroTl.to(el, {
+            opacity: 1, x: 0, y: 0,
+            duration: 0.75,
+            ease: 'power2.out'
+        }, i === 0 ? 0 : '-=0.45');
+    });
 
-    // ── 2. CANVAS PARTICLE BACKGROUND ───────────────────────────
+    // ── 3. SCROLL REVEALS ────────────────────────────────────────
+    scrollEls.forEach(({ el, stagger }) => {
+        const nodes = document.querySelectorAll(el);
+        if (!nodes.length) return;
+
+        if (stagger && nodes.length > 1) {
+            // Reveal group with stagger
+            ScrollTrigger.create({
+                trigger: nodes[0],
+                start: 'top 90%',
+                once: true,
+                onEnter: () => {
+                    gsap.to(nodes, {
+                        opacity: 1, y: 0,
+                        duration: 0.65,
+                        stagger: 0.1,
+                        ease: 'power2.out',
+                    });
+                },
+            });
+        } else {
+            // Reveal each node individually
+            nodes.forEach((node) => {
+                ScrollTrigger.create({
+                    trigger: node,
+                    start: 'top 90%',
+                    once: true,
+                    onEnter: () => {
+                        gsap.to(node, {
+                            opacity: 1, y: 0,
+                            duration: 0.7,
+                            ease: 'power2.out',
+                        });
+                    },
+                });
+            });
+        }
+    });
+
+    // ── 4. CANVAS PARTICLE BACKGROUND ───────────────────────────
     const canvas = document.getElementById('bg-canvas');
     const ctx    = canvas.getContext('2d');
-    let W, H, particles = [];
+    let W, H;
 
     function resize() {
         W = canvas.width  = window.innerWidth;
         H = canvas.height = window.innerHeight;
     }
-    window.addEventListener('resize', resize);
+    window.addEventListener('resize', resize, { passive: true });
     resize();
 
     const PARTICLE_COUNT = 55;
     const isLight = () => document.documentElement.classList.contains('light');
 
     class Particle {
-        constructor() { this.reset(); }
-        reset() {
+        constructor() { this.reset(true); }
+        reset(init = false) {
             this.x  = Math.random() * W;
-            this.y  = Math.random() * H;
+            this.y  = init ? Math.random() * H : Math.random() * H;
             this.r  = Math.random() * 1.4 + 0.3;
             this.vx = (Math.random() - 0.5) * 0.18;
             this.vy = (Math.random() - 0.5) * 0.18;
@@ -66,13 +155,14 @@ document.addEventListener('DOMContentLoaded', () => {
         draw() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-            const col = isLight() ? `rgba(180,130,10,${this.alpha})` : `rgba(255,215,0,${this.alpha})`;
-            ctx.fillStyle = col;
+            ctx.fillStyle = isLight()
+                ? `rgba(180,130,10,${this.alpha})`
+                : `rgba(255,215,0,${this.alpha})`;
             ctx.fill();
         }
     }
 
-    for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(new Particle());
+    const particles = Array.from({ length: PARTICLE_COUNT }, () => new Particle());
 
     function drawConnections() {
         const MAX_DIST = 130;
@@ -82,12 +172,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dy = particles[i].y - particles[j].y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist < MAX_DIST) {
-                    const alpha = (1 - dist / MAX_DIST) * 0.08;
-                    const col = isLight() ? `rgba(180,130,10,${alpha})` : `rgba(255,215,0,${alpha})`;
+                    const a = (1 - dist / MAX_DIST) * 0.07;
                     ctx.beginPath();
                     ctx.moveTo(particles[i].x, particles[i].y);
                     ctx.lineTo(particles[j].x, particles[j].y);
-                    ctx.strokeStyle = col;
+                    ctx.strokeStyle = isLight() ? `rgba(180,130,10,${a})` : `rgba(255,215,0,${a})`;
                     ctx.lineWidth = 0.5;
                     ctx.stroke();
                 }
@@ -101,36 +190,52 @@ document.addEventListener('DOMContentLoaded', () => {
         drawConnections();
         requestAnimationFrame(renderCanvas);
     }
-    renderCanvas();
 
-    // Respect reduced motion
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        renderCanvas();
+    } else {
         canvas.style.display = 'none';
     }
 
-    // ── 3. NAVBAR SCROLL EFFECT ──────────────────────────────────
+    // ── 5. CURSOR GLOW ──────────────────────────────────────────
+    const cursorGlow = document.getElementById('cursor-glow');
+    let mouseX = 0, mouseY = 0, glowX = 0, glowY = 0;
+
+    document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        cursorGlow.style.opacity = '1';
+    });
+    document.addEventListener('mouseleave', () => { cursorGlow.style.opacity = '0'; });
+
+    (function animateCursor() {
+        glowX += (mouseX - glowX) * 0.08;
+        glowY += (mouseY - glowY) * 0.08;
+        cursorGlow.style.left = glowX + 'px';
+        cursorGlow.style.top  = glowY + 'px';
+        requestAnimationFrame(animateCursor);
+    })();
+
+    // ── 6. NAVBAR SCROLL STATE ───────────────────────────────────
     const navbar = document.getElementById('navbar');
     window.addEventListener('scroll', () => {
         navbar.classList.toggle('scrolled', window.scrollY > 40);
     }, { passive: true });
 
-    // ── 4. HAMBURGER MENU ────────────────────────────────────────
+    // ── 7. HAMBURGER MENU ────────────────────────────────────────
     const hamburger = document.getElementById('nav-hamburger');
     const drawer    = document.getElementById('nav-drawer');
-    hamburger.addEventListener('click', () => {
-        drawer.classList.toggle('open');
-    });
+    hamburger.addEventListener('click', () => drawer.classList.toggle('open'));
     drawer.querySelectorAll('a').forEach(a => {
         a.addEventListener('click', () => drawer.classList.remove('open'));
     });
 
-    // ── 5. THEME TOGGLE ──────────────────────────────────────────
-    const themeBtn  = document.getElementById('theme-toggle');
-    const iconMoon  = document.getElementById('icon-moon');
-    const iconSun   = document.getElementById('icon-sun');
-    const html      = document.documentElement;
+    // ── 8. THEME TOGGLE ──────────────────────────────────────────
+    const themeBtn = document.getElementById('theme-toggle');
+    const iconMoon = document.getElementById('icon-moon');
+    const iconSun  = document.getElementById('icon-sun');
+    const html     = document.documentElement;
 
-    // Restore saved theme
     const saved = localStorage.getItem('theme');
     if (saved === 'light') {
         html.classList.add('light');
@@ -140,145 +245,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     themeBtn.addEventListener('click', () => {
         html.classList.toggle('light');
-        const isLight = html.classList.contains('light');
-        localStorage.setItem('theme', isLight ? 'light' : 'dark');
-        iconMoon.style.display = isLight ? 'none' : 'block';
-        iconSun.style.display  = isLight ? 'block' : 'none';
+        const light = html.classList.contains('light');
+        localStorage.setItem('theme', light ? 'light' : 'dark');
+        iconMoon.style.display = light ? 'none'  : 'block';
+        iconSun.style.display  = light ? 'block' : 'none';
     });
 
-    // ── 6. ORB MOUSE PARALLAX ───────────────────────────────────
+    // ── 9. ORB MOUSE PARALLAX ───────────────────────────────────
     const orbWrapper = document.getElementById('orb-wrapper');
     if (orbWrapper) {
         document.addEventListener('mousemove', (e) => {
-            const { innerWidth: W, innerHeight: H } = window;
-            const xRatio = (e.clientX / W - 0.5) * 2;
-            const yRatio = (e.clientY / H - 0.5) * 2;
+            const xRatio = (e.clientX / window.innerWidth  - 0.5) * 2;
+            const yRatio = (e.clientY / window.innerHeight - 0.5) * 2;
             orbWrapper.style.transform = `rotateY(${xRatio * 10}deg) rotateX(${-yRatio * 8}deg)`;
-        });
+        }, { passive: true });
     }
 
-    // ── 7. GSAP + SCROLLTRIGGER ANIMATIONS ──────────────────────
-    gsap.registerPlugin(ScrollTrigger);
-
-    // Hero entrance sequence
-    const heroTl = gsap.timeline({ delay: 0.3 });
-    heroTl
-        .to('.hero-eyebrow', { opacity: 1, y: 0, duration: 0.7, ease: 'power2.out' })
-        .to('.hero-name',    { opacity: 1, y: 0, duration: 0.7, ease: 'power2.out' }, '-=0.4')
-        .to('.hero-sub',     { opacity: 1, y: 0, duration: 0.7, ease: 'power2.out' }, '-=0.4')
-        .to('.hero-cta',     { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }, '-=0.35')
-        .to('.hero-tags',    { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }, '-=0.3')
-        .to('.hero-visual',  { opacity: 1, x: 0, duration: 0.9, ease: 'power2.out' }, '-=0.6');
-
-    // Generic scroll-triggered reveal for all [data-gsap] elements
-    // (excluding hero elements already animated above)
-    const scrollEls = document.querySelectorAll('[data-gsap]:not(.hero [data-gsap])');
-
-    scrollEls.forEach(el => {
-        const delay = parseFloat(el.dataset.delay || '0');
-        const dir   = el.dataset.gsap;
-
-        let fromVars = { opacity: 0, duration: 0.75, delay, ease: 'power2.out' };
-        if (dir === 'fade-up')    fromVars.y = 24;
-        if (dir === 'fade-left')  fromVars.x = 30;
-        if (dir === 'fade-right') fromVars.x = -30;
-
-        ScrollTrigger.create({
-            trigger: el,
-            start: 'top 88%',
-            once: true,
-            onEnter: () => gsap.to(el, fromVars),
-        });
-    });
-
-    // Stats count-up on scroll into view
-    const statNums = document.querySelectorAll('.stat-num');
-    const statObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const el = entry.target;
-                const text = el.textContent;
-                const num = parseFloat(text);
-                if (!isNaN(num) && !el.dataset.counted) {
-                    el.dataset.counted = true;
-                    gsap.from({ val: 0 }, {
-                        val: num,
-                        duration: 1.2,
-                        ease: 'power2.out',
-                        onUpdate: function() {
-                            el.textContent = Math.round(this.targets()[0].val) + (text.includes('+') ? '+' : (text.includes('th') ? 'th' : ''));
-                        }
-                    });
-                }
-                statObserver.unobserve(el);
-            }
-        });
-    }, { threshold: 0.5 });
-    statNums.forEach(el => statObserver.observe(el));
-
-    // Project featured card reveal
-    ScrollTrigger.create({
-        trigger: '.project-featured',
-        start: 'top 88%',
-        once: true,
-        onEnter: () => gsap.to('.project-featured', { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out' }),
-    });
-
-    // Gaming cards
-    document.querySelectorAll('.gaming-card').forEach((el, i) => {
-        ScrollTrigger.create({
-            trigger: el,
-            start: 'top 88%',
-            once: true,
-            onEnter: () => gsap.to(el, { opacity: 1, y: 0, duration: 0.7, delay: i * 0.12, ease: 'power2.out' }),
-        });
-    });
-
-    // Terminal container
-    ScrollTrigger.create({
-        trigger: '#terminal-container',
-        start: 'top 88%',
-        once: true,
-        onEnter: () => gsap.to('#terminal-container', { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out' }),
-    });
-
-    // About stats
-    ScrollTrigger.create({
-        trigger: '.about-stats',
-        start: 'top 88%',
-        once: true,
-        onEnter: () => gsap.to('.about-stats', { opacity: 1, y: 0, duration: 0.7, ease: 'power2.out' }),
-    });
-    document.querySelectorAll('.about-body').forEach((el, i) => {
-        ScrollTrigger.create({
-            trigger: el,
-            start: 'top 88%',
-            once: true,
-            onEnter: () => gsap.to(el, { opacity: 1, y: 0, duration: 0.65, delay: i * 0.1, ease: 'power2.out' }),
-        });
-    });
-
-    // Project cards
-    document.querySelectorAll('.project-card').forEach((el, i) => {
-        ScrollTrigger.create({
-            trigger: el,
-            start: 'top 88%',
-            once: true,
-            onEnter: () => gsap.to(el, { opacity: 1, y: 0, duration: 0.7, delay: i * 0.12, ease: 'power2.out' }),
-        });
-    });
-
-    // Goal items
-    document.querySelectorAll('.goal-item').forEach((el, i) => {
-        ScrollTrigger.create({
-            trigger: el,
-            start: 'top 88%',
-            once: true,
-            onEnter: () => gsap.to(el, { opacity: 1, y: 0, duration: 0.65, delay: i * 0.1, ease: 'power2.out' }),
-        });
-    });
-
-    // ── 8. BEFORE / AFTER SLIDER ─────────────────────────────────
+    // ── 10. BEFORE/AFTER SLIDER ──────────────────────────────────
     const sliderContainer = document.getElementById('ba-slider');
     if (sliderContainer) {
         const afterImg  = sliderContainer.querySelector('.ba-after');
@@ -289,150 +272,86 @@ document.addEventListener('DOMContentLoaded', () => {
             const rect = sliderContainer.getBoundingClientRect();
             let pct = ((clientX - rect.left) / rect.width) * 100;
             pct = Math.max(2, Math.min(98, pct));
-            afterImg.style.clipPath = `inset(0 0 0 ${pct}%)`;
-            divider.style.left      = `${pct}%`;
+            afterImg.style.clipPath  = `inset(0 0 0 ${pct}%)`;
+            divider.style.left       = `${pct}%`;
         }
 
-        sliderContainer.addEventListener('mousedown', (e) => { isDragging = true; updateSlider(e.clientX); });
+        sliderContainer.addEventListener('mousedown',  (e) => { isDragging = true; updateSlider(e.clientX); });
         window.addEventListener('mouseup',   () => { isDragging = false; });
         window.addEventListener('mousemove', (e) => { if (isDragging) updateSlider(e.clientX); });
-
-        // Touch events
         sliderContainer.addEventListener('touchstart', (e) => { isDragging = true; updateSlider(e.touches[0].clientX); }, { passive: true });
-        window.addEventListener('touchend',   () => { isDragging = false; });
-        window.addEventListener('touchmove',  (e) => { if (isDragging) updateSlider(e.touches[0].clientX); }, { passive: true });
+        window.addEventListener('touchend',  () => { isDragging = false; });
+        window.addEventListener('touchmove', (e) => { if (isDragging) updateSlider(e.touches[0].clientX); }, { passive: true });
     }
 
-    // ── 9. INTERACTIVE TERMINAL ──────────────────────────────────
+    // ── 11. INTERACTIVE TERMINAL ─────────────────────────────────
     $('#terminal-container').terminal(function(command, term) {
         const cmd = command.trim().toLowerCase();
         if (!cmd) { term.echo(''); return; }
-
         switch (cmd) {
             case 'help':
-                term.echo([
-                    '',
-                    '  [[;#FFD700;]Available Commands:]',
-                    '  [[;#888;]whoami ]   — About me',
-                    '  [[;#888;]ls      ]   — Current focuses',
-                    '  [[;#888;]skills  ]   — My tech stack',
-                    '  [[;#888;]goals   ]   — Where I\'m headed',
-                    '  [[;#888;]clear   ]   — Clear terminal',
-                    '',
-                ].join('\n'));
+                term.echo('\n  [[;#FFD700;]Available Commands:]\n  [[;#888;]whoami ]  — About me\n  [[;#888;]ls     ]  — Current focuses\n  [[;#888;]skills ]  — Tech stack\n  [[;#888;]goals  ]  — Where I\'m headed\n  [[;#888;]clear  ]  — Clear terminal\n');
                 break;
-
             case 'whoami':
-                term.echo([
-                    '',
-                    '  [[;#FFD700;]Heng Reaksa] — IT Student & Developer',
-                    '  Phnom Penh, Cambodia 🇰🇭',
-                    '',
-                    '  Curious, disciplined, and analytical. I build things to',
-                    '  understand them, and share what I learn with clarity.',
-                    '',
-                ].join('\n'));
+                term.echo('\n  [[;#FFD700;]Heng Reaksa] — IT Student & Developer\n  Phnom Penh, Cambodia 🇰🇭\n\n  Curious, disciplined, and analytical. I build things to\n  understand them, and share what I learn with clarity.\n');
                 break;
-
             case 'ls':
-                term.echo([
-                    '',
-                    '  [[;#FFD700;]Current Focuses:]',
-                    '  → Mastering full-stack web development (UX/UI design)',
-                    '  → Automating daily tasks with scripts',
-                    '  → Researching next-gen GPUs',
-                    '  → Building this very portfolio 🛠️',
-                    '',
-                ].join('\n'));
+                term.echo('\n  [[;#FFD700;]Current Focuses:]\n  → Mastering full-stack web development (UX/UI design)\n  → Automating daily tasks with scripts\n  → Researching next-gen GPUs\n  → Building this very portfolio 🛠️\n');
                 break;
-
             case 'skills':
-                term.echo([
-                    '',
-                    '  [[;#FFD700;]Tech Stack:]',
-                    '  Web   → HTML, CSS, JavaScript',
-                    '  Back  → PHP, Laravel, MySQL',
-                    '  Style → Tailwind CSS, Bootstrap',
-                    '  HW    → System builds, optimization, thermal mgmt',
-                    '',
-                ].join('\n'));
+                term.echo('\n  [[;#FFD700;]Tech Stack:]\n  Web   → HTML, CSS, JavaScript\n  Back  → PHP, Laravel, MySQL\n  Style → Tailwind CSS, Bootstrap\n  HW    → System builds, optimization, thermal mgmt\n');
                 break;
-
             case 'goals':
-                term.echo([
-                    '',
-                    '  [[;#FFD700;]Where I\'m Headed:]',
-                    '  [01] Master full-stack dev & UX/UI',
-                    '  [02] Ship real-world impactful projects',
-                    '  [03] Become a well-rounded IT professional',
-                    '',
-                ].join('\n'));
+                term.echo('\n  [[;#FFD700;]Where I\'m Headed:]\n  [01] Master full-stack dev & UX/UI\n  [02] Ship real-world impactful projects\n  [03] Become a well-rounded IT professional\n');
                 break;
-
             case 'clear':
                 term.clear();
                 break;
-
             default:
-                term.echo(`  Command not found: [[;#ff6b6b;]${command}]. Type [[;#FFD700;]help] to see available commands.`);
+                term.echo(`  Command not found: [[;#ff6b6b;]${command}]. Type [[;#FFD700;]help] for available commands.`);
         }
     }, {
-        greetings: [
-            '[[;#FFD700;]┌─────────────────────────────────────┐]',
-            '[[;#FFD700;]│   reaksa.dev — Interactive Console  │]',
-            '[[;#FFD700;]└─────────────────────────────────────┘]',
-            '',
-            "  Type [[;#FFD700;]help] to see what's available.",
-            '',
-        ].join('\n'),
-        name:    'reaksa_console',
-        height:  220,
-        width:   '100%',
-        prompt:  '[[;#FFD700;]visitor@reaksa.dev]:~$ ',
+        greetings: '[[;#FFD700;]┌─────────────────────────────────────┐]\n[[;#FFD700;]│   reaksa.dev — Interactive Console  │]\n[[;#FFD700;]└─────────────────────────────────────┘]\n\n  Type [[;#FFD700;]help] to get started.\n',
+        name:   'reaksa_console',
+        height: 220,
+        width:  '100%',
+        prompt: '[[;#FFD700;]visitor@reaksa.dev]:~$ ',
     });
 
-    // ── 10. SMOOTH ANCHOR LINKS ──────────────────────────────────
+    // ── 12. SMOOTH ANCHOR SCROLLING ──────────────────────────────
+    const navH = navbar.offsetHeight;
     document.querySelectorAll('a[href^="#"]').forEach(a => {
         a.addEventListener('click', function(e) {
             const target = document.querySelector(this.getAttribute('href'));
             if (target) {
                 e.preventDefault();
-                const navH = document.getElementById('navbar').offsetHeight;
-                const top  = target.getBoundingClientRect().top + window.scrollY - navH - 16;
+                const top = target.getBoundingClientRect().top + window.scrollY - navH - 16;
                 window.scrollTo({ top, behavior: 'smooth' });
             }
         });
     });
 
-    // ── 11. NAV LINK ACTIVE STATE ────────────────────────────────
-    const sections  = document.querySelectorAll('section[id]');
-    const navLinks  = document.querySelectorAll('.nav-links a, .nav-drawer a');
-    const navH      = document.getElementById('navbar').offsetHeight;
-
-    const sectionObserver = new IntersectionObserver((entries) => {
+    // ── 13. NAV ACTIVE STATE ─────────────────────────────────────
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-links a, .nav-drawer a');
+    new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const id = entry.target.id;
-                navLinks.forEach(a => {
-                    a.classList.toggle('active', a.getAttribute('href') === `#${id}`);
-                });
-                if (entry.target.dataset.title) {
-                    document.title = entry.target.dataset.title;
-                }
+                navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === `#${id}`));
             }
         });
-    }, { rootMargin: `-${navH}px 0px -50% 0px` });
-
-    sections.forEach(s => sectionObserver.observe(s));
-
-    // ── 12. BUTTON HOVER MICRO-INTERACTION ───────────────────────
-    document.querySelectorAll('.btn').forEach(btn => {
-        btn.addEventListener('mouseenter', function() {
-            gsap.to(this, { scale: 1.03, duration: 0.2, ease: 'power1.out' });
-        });
-        btn.addEventListener('mouseleave', function() {
-            gsap.to(this, { scale: 1, duration: 0.25, ease: 'power1.out' });
-        });
+    }, { rootMargin: `-${navH}px 0px -50% 0px` }).observe(...sections) ;
+    // observe each section
+    sections.forEach(s => {
+        new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === `#${id}`));
+                }
+            });
+        }, { rootMargin: `-${navH}px 0px -50% 0px` }).observe(s);
     });
 
 });
